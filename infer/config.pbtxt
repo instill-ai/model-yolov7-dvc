@@ -1,0 +1,41 @@
+name: "infer"
+platform: "onnxruntime_onnx"
+max_batch_size: 32
+input [
+  {
+    name: "images",
+    data_type: TYPE_FP32
+    format: FORMAT_NHWC
+    dims: [ 3, -1, -1 ]
+  }
+]
+output [
+  {
+    name: "output_1"
+    data_type: TYPE_FP32
+    dims: [ -1, -1]
+  },
+  {
+    name: "output_2"
+    data_type: TYPE_FP32
+    dims: [ 3, -1, -1, 85]
+  },
+  {
+    name: "output_3"
+    data_type: TYPE_FP32
+    dims: [ 3, -1, -1, 85]
+  },
+  {
+    name: "output_4"
+    data_type: TYPE_FP32
+    dims: [ 3, -1, -1, 85]
+  }
+]
+instance_group [
+  {
+    count: 1
+    kind: KIND_GPU
+  }
+]
+dynamic_batching { }
+version_policy: { all { }}

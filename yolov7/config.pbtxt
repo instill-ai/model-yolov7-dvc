@@ -1,0 +1,107 @@
+name: "yolov7"
+platform: "ensemble"
+max_batch_size: 32
+input [
+  {
+    name: "input"
+    data_type: TYPE_STRING
+    dims: [ 1 ]
+  }
+]
+output [
+  {
+    name: "output_bboxes_ensemble"
+    data_type: TYPE_FP32
+    dims: [ -1, 5 ]
+  },
+  {
+    name: "output_labels_ensemble"
+    data_type: TYPE_STRING
+    dims: [ -1 ]
+  }
+]
+ensemble_scheduling {
+  step [
+    {
+      model_name: "pre"
+      model_version: 1
+      input_map {
+        key: "input"
+        value: "input"
+      }
+      output_map {
+        key: "output"
+        value: "preprocessed_images"
+      }
+      output_map {
+        key: "output_orig_img_hw"
+        value: "orig_img_hw"
+      }
+      output_map {
+        key: "output_scaled_img_hw"
+        value: "scaled_img_hw"
+      }
+    },
+    {
+      model_name: "infer"
+      model_version: 1
+      input_map {
+        key: "images"
+        value: "preprocessed_images"
+      }
+      output_map {
+        key: "output_1"
+        value: "output_1"
+      }
+      output_map {
+        key: "output_2"
+        value: "output_2"
+      }
+      output_map {
+        key: "output_3"
+        value: "output_3"
+      }
+      output_map {
+        key: "output_4"
+        value: "output_4"
+      }
+    },
+    {
+      model_name: "post"
+      model_version: 1
+      input_map {
+        key: "input_1"
+        value: "output_1"
+      }
+      input_map {
+        key: "input_2"
+        value: "output_2"
+      }
+      input_map {
+        key: "input_3"
+        value: "output_3"
+      }
+      input_map {
+        key: "input_4"
+        value: "output_4"
+      }
+      input_map {
+        key: "input_orig_img_hw"
+        value: "orig_img_hw"
+      }
+      input_map {
+        key: "input_scaled_img_hw"
+        value: "scaled_img_hw"
+      }
+      output_map {
+        key: "output_bboxes"
+        value: "output_bboxes_ensemble"
+      }
+      output_map {
+        key: "output_labels"
+        value: "output_labels_ensemble"
+      }
+    }
+  ]
+}
+version_policy: { all { }}
