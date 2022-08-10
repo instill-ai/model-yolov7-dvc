@@ -10,7 +10,48 @@ from triton_python_backend_utils import Tensor, InferenceResponse, \
     triton_string_to_numpy
 
 
-def image_preprocess(image, target_size, stride=32):
+def get_preprocess_size(image, target_size, stride=32):
+    ih, iw = target_size
+    h, w, _ = np.array(image).shape
+
+    scale = min(iw/w, ih/h)
+    nw, nh = int(round(scale * w)), int(round(scale * h))
+    dw, dh = iw - nw, ih - nh  # wh padding
+    # wh padding to the closest value dividable by stride
+    dw, dh = np.mod(dw, stride), np.mod(dh, stride)
+    # scaled with padding that is dividable by stride
+    scaled_w, scaled_h = nw + dw, nh + dh
+
+    return scaled_h, scaled_w, h, w
+
+
+def image_preprocess_for_batch(image, batch_h, batch_w):
+    h, w, _ = np.array(image).shape
+
+    scale = min(batch_w/w, batch_h/h)
+    nw, nh = int(round(scale * w)), int(round(scale * h))
+    dw, dh = batch_w - nw, batch_h - nh  # wh padding
+    dw /= 2  # divide padding into 2 sides
+    dh /= 2
+
+    top = int(round(dh - 0.1))
+    left = int(round(dw - 0.1))
+
+    image_resized = image.resize((nw, nh))
+    image_resized = np.array(image_resized)  # h x w x c
+    image_resized = np.transpose(
+        image_resized, axes=(2, 0, 1))  # convert to c x h x w
+
+    image_padded = np.full(shape=[3, batch_h, batch_w], fill_value=114.0)
+    image_padded[:, top:nh+top, left:nw+left] = image_resized
+    image_padded = np.ascontiguousarray(image_padded)
+
+    image_padded = image_padded / 255.
+
+    return image_padded
+
+
+def image_preprocess_for_single(image, target_size, stride=32):
 
     ih, iw = target_size
     h, w, _ = np.array(image).shape
@@ -105,14 +146,35 @@ class TritonPythonModel(object):
 
             batch_out = {k: [] for k, name in self.output_names.items(
             ) if name in request.requested_output_names()}
+
+            # Check size of all images in the batch
+            batch_images = []
+            batch_w, batch_h = -1, -1
             for img in batch_in:  # img is shape (1,)
                 pil_img = Image.open(io.BytesIO(img.astype(bytes)))  # RGB
-                image_data, scaled_h, scaled_w, orig_h, orig_w = image_preprocess(
+                scaled_h, scaled_w, orig_h, orig_w = get_preprocess_size(
                     pil_img, [640, 640])
+                # the size of the resulting batch tensor will be the max value among each image in the batch
+                batch_w = max(batch_w, scaled_w)
+                batch_h = max(batch_h, scaled_h)
+                batch_images.append(pil_img)
+                batch_out['orig_img_hw'].append([orig_h, orig_w])
+
+            for pil_img in batch_images:
+                image_data = image_preprocess_for_batch(
+                    pil_img, batch_h, batch_w)
                 image_data = image_data.astype(np.float32)
                 batch_out['img'].append(image_data)
-                batch_out['orig_img_hw'].append([orig_h, orig_w])
-                batch_out['scaled_img_hw'].append([scaled_h, scaled_w])
+                batch_out['scaled_img_hw'].append([batch_h, batch_w])
+
+            # for img in batch_in:  # img is shape (1,)
+            #     pil_img = Image.open(io.BytesIO(img.astype(bytes)))  # RGB
+            #     image_data, scaled_h, scaled_w, orig_h, orig_w = image_preprocess_for_single(
+            #         pil_img, [640, 640])
+            #     image_data = image_data.astype(np.float32)
+            #     batch_out['img'].append(image_data)
+            #     batch_out['orig_img_hw'].append([orig_h, orig_w])
+            #     batch_out['scaled_img_hw'].append([scaled_h, scaled_w])
 
             # Format outputs to build an InferenceResponse
             # Assumes there is only one output
