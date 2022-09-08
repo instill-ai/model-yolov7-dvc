@@ -1,6 +1,6 @@
 name: "post"
 backend: "python"
-max_batch_size: 32
+max_batch_size: 8
 input [
   {
     name: "input_1"
