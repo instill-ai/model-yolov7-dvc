@@ -4,6 +4,7 @@ import json
 
 from typing import List
 from PIL import Image
+import cv2
 
 from triton_python_backend_utils import Tensor, InferenceResponse, \
     get_input_tensor_by_name, InferenceRequest, get_output_config_by_name, \
@@ -37,7 +38,7 @@ def image_preprocess_for_batch(image, batch_h, batch_w):
     top = int(round(dh - 0.1))
     left = int(round(dw - 0.1))
 
-    image_resized = image.resize((nw, nh))
+    image_resized = cv2.resize(image, (nw, nh), interpolation=cv2.INTER_CUBIC)
     image_resized = np.array(image_resized)  # h x w x c
     image_resized = np.transpose(
         image_resized, axes=(2, 0, 1))  # convert to c x h x w
@@ -69,7 +70,7 @@ def image_preprocess_for_single(image, target_size, stride=32):
     top = int(round(dh - 0.1))
     left = int(round(dw - 0.1))
 
-    image_resized = image.resize((nw, nh))
+    image_resized = cv2.resize(image, (nw, nh), interpolation=cv2.INTER_CUBIC)
     image_resized = np.array(image_resized)  # h x w x c
     image_resized = np.transpose(
         image_resized, axes=(2, 0, 1))  # convert to c x h x w
@@ -152,17 +153,20 @@ class TritonPythonModel(object):
             batch_w, batch_h = -1, -1
             for img in batch_in:  # img is shape (1,)
                 pil_img = Image.open(io.BytesIO(img.astype(bytes)))  # RGB
+                image = np.array(pil_img)
+                if len(image.shape) == 2:  # gray image
+                    image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
                 scaled_h, scaled_w, orig_h, orig_w = get_preprocess_size(
-                    pil_img, [640, 640])
+                    image, [640, 640])
                 # the size of the resulting batch tensor will be the max value among each image in the batch
                 batch_w = max(batch_w, scaled_w)
                 batch_h = max(batch_h, scaled_h)
-                batch_images.append(pil_img)
+                batch_images.append(image)
                 batch_out['orig_img_hw'].append([orig_h, orig_w])
 
-            for pil_img in batch_images:
+            for image in batch_images:
                 image_data = image_preprocess_for_batch(
-                    pil_img, batch_h, batch_w)
+                    image, batch_h, batch_w)
                 image_data = image_data.astype(np.float32)
                 batch_out['img'].append(image_data)
                 batch_out['scaled_img_hw'].append([batch_h, batch_w])
