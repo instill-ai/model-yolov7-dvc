@@ -166,7 +166,7 @@ class TritonPythonModel(object):
             for image in batch_images:
                 image_data = image_preprocess_for_batch(
                     image, batch_h, batch_w)
-                image_data = image_data.astype(np.float32)
+                image_data = image_data.astype(float)
                 batch_out['img'].append(image_data)
                 batch_out['scaled_img_hw'].append([batch_h, batch_w])
 
@@ -174,7 +174,7 @@ class TritonPythonModel(object):
             #     pil_img = Image.open(io.BytesIO(img.astype(bytes)))  # RGB
             #     image_data, scaled_h, scaled_w, orig_h, orig_w = image_preprocess_for_single(
             #         pil_img, [640, 640])
-            #     image_data = image_data.astype(np.float32)
+            #     image_data = image_data.astype(float)
             #     batch_out['img'].append(image_data)
             #     batch_out['orig_img_hw'].append([orig_h, orig_w])
             #     batch_out['scaled_img_hw'].append([scaled_h, scaled_w])
