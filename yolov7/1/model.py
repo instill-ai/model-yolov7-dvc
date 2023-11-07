@@ -322,10 +322,9 @@ class Yolov7:
                     print(f"WARNING: NMS time limit {time_limit}s exceeded")
                     break  # time limit exceeded
 
-                return output
+            return output
 
-        outputs = torch.from_numpy(outputs.as_numpy())
-        pred_list = non_max_suppression(outputs)
+        pred_list = non_max_suppression(torch.from_numpy(np.asarray(outputs)))
 
         bboxes = []
         labels = []
@@ -345,14 +344,14 @@ class Yolov7:
             else:
                 bboxes.append(np.array([]))
             if len(pred) > 0:
-                labels.append([self.categories[idx] for idx in pred[:, 5]])
+                labels.append([self.categories[int(idx)] for idx in pred[:, 5]])
             else:
                 labels.append([])
 
         if max_num_bboxes_in_single_img == 0:
             # When no detected object at all in all imgs in the batch
             for idx, _ in enumerate(bboxes):
-                bboxes[idx] = [[-1, -1, -1, -1, -1]]
+                bboxes[idx] = [np.array([-1, -1, -1, -1, -1], dtype=np.float32)]
             for idx, _ in enumerate(labels):
                 labels[idx] = ["0"]
         else:
@@ -362,7 +361,7 @@ class Yolov7:
             for idx, out in enumerate(bboxes):
                 if len(out) < max_num_bboxes_in_single_img:
                     num_to_add = max_num_bboxes_in_single_img - len(out)
-                    to_add = -np.ones((num_to_add, 5))
+                    to_add = -np.ones((num_to_add, 5), dtype=np.float32)
                     if len(out) == 0:
                         bboxes[idx] = to_add
                     else:
@@ -393,29 +392,32 @@ class Yolov7:
 
             images, orig_img_hw, scaled_img_hw = self._pre_procoess(input_tensors)
 
-            images = np.asarray(images)
-            outputs = self.model.run(None, {"input": images})
-            # shape=
+            images = np.asarray(images, dtype=np.float32)
+            outputs = self.model.run(None, {"images": images})
 
-            bboxes, labels = self._post_process(outputs, orig_img_hw, scaled_img_hw)
-
-            bboxes_out = [bytes(f"{bboxes[i]}", "utf-8") for i in range(len(bboxes))]
+            bboxes, labels = self._post_process(outputs[0], orig_img_hw, scaled_img_hw)
 
             resp.outputs.append(
                 InferTensor(
                     name="output_bboxes",
+                    shape=[len(images), len(bboxes[0]), 5],
+                    datatype=str(DataType.TYPE_FP32.name),
                 )
             )
 
-            resp.raw_output_contents.append(
-                serialize_byte_tensor(np.asarray(bboxes_out))
-            )
+            resp.raw_output_contents.append(np.asarray(bboxes).tobytes())
 
-            labels_out = [bytes(f"{labels[i]}", "utf-8") for i in range(len(labels))]
+            labels_out = []
+            for l in labels:
+                labels_out.extend(l)
+
+            labels_out = [bytes(f'{labels_out[i]}', "utf-8") for i in range(len(labels_out))]
 
             resp.outputs.append(
                 InferTensor(
                     name="output_labels",
+                    shape=[len(images), len(labels[0])],
+                    datatype=str(DataType.TYPE_STRING),
                 )
             )
 
