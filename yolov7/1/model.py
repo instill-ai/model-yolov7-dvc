@@ -12,11 +12,10 @@ import torchvision
 from PIL import Image
 from instill.configuration import CORE_RAY_ADDRESS
 from instill.helpers.ray_helper import (
+    InstillRayModelConfig,
     DataType,
     serialize_byte_tensor,
     deserialize_bytes_tensor,
-    deploy_decorator,
-    undeploy_decorator,
     entry,
 )
 
@@ -411,7 +410,9 @@ class Yolov7:
             for l in labels:
                 labels_out.extend(l)
 
-            labels_out = [bytes(f'{labels_out[i]}', "utf-8") for i in range(len(labels_out))]
+            labels_out = [
+                bytes(f"{labels_out[i]}", "utf-8") for i in range(len(labels_out))
+            ]
 
             resp.outputs.append(
                 InferTensor(
@@ -428,37 +429,27 @@ class Yolov7:
         return resp
 
 
-@deploy_decorator
-def deploy_model(
-    num_cpus: str,
-    num_replicas: str,
-    application_name: str,
-    model_path: str,
-    model_name: str,
-    route_prefix: str,
-):
+def deploy_model(model_config: InstillRayModelConfig):
     c_app = Yolov7.options(
-        name=application_name,
-        ray_actor_options={
-            "num_cpus": num_cpus,
-        },
-        num_replicas=num_replicas,
-    ).bind(model_path)
+        name=model_config.application_name,
+        ray_actor_options=model_config.ray_actor_options,
+        max_concurrent_queries=model_config.max_concurrent_queries,
+        autoscaling_config=model_config.ray_autoscaling_options,
+    ).bind(model_config.model_path)
 
-    serve.run(c_app, name=model_name, route_prefix=route_prefix)
+    serve.run(
+        c_app, name=model_config.model_name, route_prefix=model_config.route_prefix
+    )
 
 
-@undeploy_decorator
 def undeploy_model(model_name: str):
     serve.delete(model_name)
 
 
 if __name__ == "__main__":
-    args = entry()
+    func, model_config = entry()
 
-    if args.func == "deploy":
-        deploy_model(
-            num_cpus=args.cpus, num_replicas=args.replicas, model_path=args.model
-        )
-    elif args.func == "undeploy":
-        undeploy_model(model_path=args.model)
+    if func == "deploy":
+        deploy_model(model_config=model_config)
+    elif func == "undeploy":
+        undeploy_model(model_name=model_config.model_name)
