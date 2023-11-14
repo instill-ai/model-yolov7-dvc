@@ -36,10 +36,10 @@ from ray import serve
 @serve.deployment()
 class Yolov7:
     def __init__(self, model_path: str):
-        self.application_name = "_".join(model_path.split("/")[3:5])
-        self.deployement_name = model_path.split("/")[4]
         self.categories = self._image_labels()
-        self.model = ort.InferenceSession(model_path)
+        self.model = ort.InferenceSession(
+            model_path, providers=["CUDAExecutionProvider"]
+        )
 
     def _image_labels(self) -> List[str]:
         categories = []
