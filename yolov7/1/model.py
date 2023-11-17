@@ -5,6 +5,7 @@ import torch
 import time
 import requests
 
+from ray import serve
 import cv2
 import numpy as np
 import onnxruntime as ort
@@ -14,7 +15,6 @@ from instill.helpers.const import DataType
 from instill.helpers.ray_io import serialize_byte_tensor, deserialize_bytes_tensor
 from instill.helpers.ray_config import (
     InstillRayModelConfig,
-    get_compose_ray_address,
     entry,
 )
 
@@ -27,10 +27,6 @@ from ray_pb2 import (
     ModelInferResponse,
     InferTensor,
 )
-
-ray.init(address=get_compose_ray_address(10001))
-# this import must come after `ray.init()`
-from ray import serve
 
 
 @serve.deployment()
@@ -448,8 +444,10 @@ def undeploy_model(model_name: str):
 if __name__ == "__main__":
     func, model_config = entry("model.onnx")
 
-    model_config.ray_actor_options["num_cpus"] = 2
-    model_config.ray_actor_options["num_gpus"] = 0.5
+    ray.init(address=model_config.ray_addr)
+
+    model_config.ray_actor_options["num_cpus"] = 1
+    model_config.ray_actor_options["num_gpus"] = 0.2
 
     if func == "deploy":
         deploy_model(model_config=model_config)
