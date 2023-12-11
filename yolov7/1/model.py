@@ -13,10 +13,7 @@ import torchvision
 from PIL import Image
 from instill.helpers.const import DataType
 from instill.helpers.ray_io import serialize_byte_tensor, deserialize_bytes_tensor
-from instill.helpers.ray_config import (
-    InstillRayModelConfig,
-    entry,
-)
+from instill.helpers.ray_config import instill_deployment, InstillDeployable
 
 from ray_pb2 import (
     ModelReadyRequest,
@@ -29,7 +26,7 @@ from ray_pb2 import (
 )
 
 
-@serve.deployment()
+@instill_deployment
 class Yolov7:
     def __init__(self, model_path: str):
         self.categories = self._image_labels()
@@ -424,32 +421,6 @@ class Yolov7:
         return resp
 
 
-def deploy_model(model_config: InstillRayModelConfig):
-    c_app = Yolov7.options(
-        name=model_config.application_name,
-        ray_actor_options=model_config.ray_actor_options,
-        max_concurrent_queries=model_config.max_concurrent_queries,
-        autoscaling_config=model_config.ray_autoscaling_options,
-    ).bind(model_config.model_path)
-
-    serve.run(
-        c_app, name=model_config.model_name, route_prefix=model_config.route_prefix
-    )
-
-
-def undeploy_model(model_name: str):
-    serve.delete(model_name)
-
-
-if __name__ == "__main__":
-    func, model_config = entry("model.onnx")
-
-    ray.init(address=model_config.ray_addr)
-
-    model_config.ray_actor_options["num_cpus"] = 0.4
-    model_config.ray_actor_options["num_gpus"] = 0.1
-
-    if func == "deploy":
-        deploy_model(model_config=model_config)
-    elif func == "undeploy":
-        undeploy_model(model_name=model_config.model_name)
+deployable = InstillDeployable(Yolov7, "model.onnx")
+deployable.update_num_cpus(0.2)
+deployable.update_num_gpus(0.5)
