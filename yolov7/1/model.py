@@ -418,5 +418,4 @@ class Yolov7:
 
         return resp
 
-deployable = InstillDeployable(Yolov7, "model.onnx")
-deployable.update_num_cpus(2.5)
+deployable = InstillDeployable(Yolov7, "model.onnx", use_gpu=False)
