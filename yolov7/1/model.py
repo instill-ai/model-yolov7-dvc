@@ -1,11 +1,9 @@
 import io
 from typing import List
-import ray
 import torch
 import time
 import requests
 
-from ray import serve
 import cv2
 import numpy as np
 import onnxruntime as ort
@@ -421,6 +419,6 @@ class Yolov7:
         return resp
 
 
-deployable = InstillDeployable(Yolov7, "model.onnx")
-deployable.update_num_cpus(0.2)
-deployable.update_num_gpus(0.5)
+deployable = InstillDeployable(Yolov7, "model.onnx", use_gpu=True)
+deployable.update_max_replicas(8)
+deployable.update_min_replicas(0)
