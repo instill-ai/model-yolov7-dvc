@@ -14,12 +14,10 @@ from instill.helpers.ray_io import serialize_byte_tensor, deserialize_bytes_tens
 from instill.helpers.ray_config import instill_deployment, InstillDeployable
 
 from ray_pb2 import (
-    ModelReadyRequest,
-    ModelReadyResponse,
     ModelMetadataRequest,
     ModelMetadataResponse,
-    ModelInferRequest,
-    ModelInferResponse,
+    RayServiceCallRequest,
+    RayServiceCallResponse,
     InferTensor,
 )
 
@@ -65,10 +63,6 @@ class Yolov7:
                 ),
             ],
         )
-        return resp
-
-    def ModelReady(self, req: ModelReadyRequest) -> ModelReadyResponse:
-        resp = ModelReadyResponse(ready=True)
         return resp
 
     def _pre_procoess(self, input_tensors):
@@ -368,8 +362,8 @@ class Yolov7:
 
         return bboxes, labels
 
-    async def ModelInfer(self, request: ModelInferRequest) -> ModelInferResponse:
-        resp = ModelInferResponse(
+    async def __call__(self, request: RayServiceCallRequest) -> RayServiceCallResponse:
+        resp = RayServiceCallResponse(
             model_name=request.model_name,
             model_version=request.model_version,
             outputs=[],
