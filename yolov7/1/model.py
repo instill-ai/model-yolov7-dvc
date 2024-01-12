@@ -12,13 +12,10 @@ from PIL import Image
 from instill.helpers.const import DataType
 from instill.helpers.ray_io import serialize_byte_tensor, deserialize_bytes_tensor
 from instill.helpers.ray_config import instill_deployment, InstillDeployable
-
-from ray_pb2 import (
-    ModelMetadataRequest,
-    ModelMetadataResponse,
-    RayServiceCallRequest,
-    RayServiceCallResponse,
-    InferTensor,
+from instill.helpers import (
+    construct_infer_response,
+    construct_metadata_response,
+    Metadata,
 )
 
 
@@ -38,25 +35,23 @@ class Yolov7:
             categories.append(label.strip())
         return categories
 
-    def ModelMetadata(self, req: ModelMetadataRequest) -> ModelMetadataResponse:
-        resp = ModelMetadataResponse(
-            name=req.name,
-            versions=req.version,
-            framework="onnx",
+    def ModelMetadata(self, req):
+        resp = construct_metadata_response(
+            req=req,
             inputs=[
-                ModelMetadataResponse.TensorMetadata(
+                Metadata(
                     name="input",
                     datatype=str(DataType.TYPE_STRING.name),
                     shape=[1],
                 ),
             ],
             outputs=[
-                ModelMetadataResponse.TensorMetadata(
+                Metadata(
                     name="output_bboxes",
                     datatype=str(DataType.TYPE_FP32.name),
                     shape=[-1, 5],
                 ),
-                ModelMetadataResponse.TensorMetadata(
+                Metadata(
                     name="output_labels",
                     datatype=str(DataType.TYPE_STRING.name),
                     shape=[-1],
@@ -362,15 +357,14 @@ class Yolov7:
 
         return bboxes, labels
 
-    async def __call__(self, request: RayServiceCallRequest) -> RayServiceCallResponse:
-        resp = RayServiceCallResponse(
-            model_name=request.model_name,
-            model_version=request.model_version,
+    async def __call__(self, req):
+        resp = construct_infer_response(
+            req=req,
             outputs=[],
-            raw_output_contents=[],
+            raw_outputs=[],
         )
 
-        for b_tensors in request.raw_input_contents:
+        for b_tensors in req.raw_input_contents:
             input_tensors = deserialize_bytes_tensor(b_tensors)
 
             images, orig_img_hw, scaled_img_hw = self._pre_procoess(input_tensors)
@@ -381,7 +375,7 @@ class Yolov7:
             bboxes, labels = self._post_process(outputs[0], orig_img_hw, scaled_img_hw)
 
             resp.outputs.append(
-                InferTensor(
+                Metadata(
                     name="output_bboxes",
                     shape=[len(images), len(bboxes[0]), 5],
                     datatype=str(DataType.TYPE_FP32.name),
@@ -399,7 +393,7 @@ class Yolov7:
             ]
 
             resp.outputs.append(
-                InferTensor(
+                Metadata(
                     name="output_labels",
                     shape=[len(images), len(labels[0])],
                     datatype=str(DataType.TYPE_STRING),
@@ -411,5 +405,6 @@ class Yolov7:
             )
 
         return resp
+
 
 deployable = InstillDeployable(Yolov7, "model.onnx", use_gpu=False)
