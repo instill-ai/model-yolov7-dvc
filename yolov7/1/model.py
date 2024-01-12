@@ -358,12 +358,8 @@ class Yolov7:
         return bboxes, labels
 
     async def __call__(self, req):
-        resp = construct_infer_response(
-            req=req,
-            outputs=[],
-            raw_outputs=[],
-        )
-
+        resp_outputs = []
+        resp_raw_outputs = []
         for b_tensors in req.raw_input_contents:
             input_tensors = deserialize_bytes_tensor(b_tensors)
 
@@ -374,7 +370,7 @@ class Yolov7:
 
             bboxes, labels = self._post_process(outputs[0], orig_img_hw, scaled_img_hw)
 
-            resp.outputs.append(
+            resp_outputs.append(
                 Metadata(
                     name="output_bboxes",
                     shape=[len(images), len(bboxes[0]), 5],
@@ -382,7 +378,7 @@ class Yolov7:
                 )
             )
 
-            resp.raw_output_contents.append(np.asarray(bboxes).tobytes())
+            resp_raw_outputs.append(np.asarray(bboxes).tobytes())
 
             labels_out = []
             for l in labels:
@@ -392,7 +388,7 @@ class Yolov7:
                 bytes(f"{labels_out[i]}", "utf-8") for i in range(len(labels_out))
             ]
 
-            resp.outputs.append(
+            resp_outputs.append(
                 Metadata(
                     name="output_labels",
                     shape=[len(images), len(labels[0])],
@@ -400,9 +396,13 @@ class Yolov7:
                 )
             )
 
-            resp.raw_output_contents.append(
-                serialize_byte_tensor(np.asarray(labels_out))
-            )
+            resp_raw_outputs.append(serialize_byte_tensor(np.asarray(labels_out)))
+
+        resp = construct_infer_response(
+            req=req,
+            outputs=resp_outputs,
+            raw_outputs=resp_raw_outputs,
+        )
 
         return resp
 
