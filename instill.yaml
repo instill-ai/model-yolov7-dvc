@@ -1,0 +1,12 @@
+build:
+  gpu: true
+  python_version: "3.11"  # support only 3.11
+  system_packages:
+  python_packages:
+    - torch==2.2.0
+    - torchvision==0.17.0
+    - onnxruntime-gpu
+    - opencv-contrib-python-headless==4.8.1.78
+# the format for repo is {user_id}/{model_id}
+# make sure the model id matched what you created on console
+repo: admin/yolov7

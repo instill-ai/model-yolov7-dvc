@@ -21,10 +21,10 @@ from instill.helpers import (
 
 @instill_deployment
 class Yolov7:
-    def __init__(self, model_path: str):
+    def __init__(self):
         self.categories = self._image_labels()
         self.model = ort.InferenceSession(
-            model_path, providers=["CUDAExecutionProvider"]
+            "model.onnx", providers=["CUDAExecutionProvider"]
         )
 
     def _image_labels(self) -> List[str]:
@@ -407,6 +407,4 @@ class Yolov7:
         return resp
 
 
-deployable = InstillDeployable(Yolov7, "model.onnx", use_gpu=True)
-deployable.update_max_replicas(8)
-deployable.update_min_replicas(0)
+entrypoint = InstillDeployable(Yolov7).get_deployment_handle()
